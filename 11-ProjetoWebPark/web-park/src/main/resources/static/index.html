@@ -16,6 +16,7 @@
 </head>
 <body>
     <div id="app">
+        <!-- Login Form -->
         <div v-if="!data">
             <div class="card m-2">
                 <div class="card-header">
@@ -38,7 +39,9 @@
         </div>
         <div v-if="error && error!=='No session'" class="alert alert-danger m-2">{{error}}</div>
 
+        <!-- App Content (only when logged in) -->
         <div v-if="shared.session">
+            <!-- Navbar -->
             <nav class="navbar navbar-expand-lg bg-body-tertiary">
                 <div class="container-fluid">
                     <a class="navbar-brand" href="#"><i class="bi bi-p-square"></i>&nbsp;WebParking</a>
@@ -59,90 +62,198 @@
                         </ul>
                         <span class="navbar-text">
                             <i class="bi bi-person"></i>{{shared.session?.username}}
-                            <button @click="logout()" class="btn btn-sm btn-danger"><i class="bi bi-arrow-right-circle"></i></button>
+                            <button @click="logout()" class="btn btn-sm btn-danger ms-2"><i class="bi bi-arrow-right-circle"></i></button>
                         </span>
                     </div>
                 </div>
             </nav>
 
-            <div v-if="currentView === 'parking'">
-                <h2>Parking</h2>
-                <div class="input-group mb-3">
-                    <span class="input-group-text"><i class="bi bi-car-front-fill"></i></span>
-                    <input type="text" class="form-control" v-model="newPlate" placeholder="Plate" required>
-                    <input type="text" class="form-control" v-model="newModel" placeholder="Model" required>
-                    <input type="text" class="form-control" v-model="newColor" placeholder="Color" required>
-                    <button class="btn btn-primary" @click="addStay"><i class="bi bi-box-arrow-in-down"></i></button>
-                </div>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>PLACA</th><th>MODEL</th><th>COLOR</th><th>BEGIN</th><th class="text-end">PRICE</th><th>EXIT</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="item in parkingList" :key="item.id">
-                            <td>{{ item.licensePlate }}</td>
-                            <td>{{ item.vehicleModel }}</td>
-                            <td>{{ item.vehicleColor }}</td>
-                            <td>{{ formatDate(item.entryTime) }}</td>
-                            <td class="text-end">{{ getPrice(item.entryTime).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}</td>
-                            <td><button @click="finishStay(item.id)" class="btn btn-success btn-sm"><i class="bi bi-box-arrow-up"></i> Exit</button></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div v-if="currentView === 'history'">
-                <h2>Parking History</h2>
-                <table class="table">
-                    <thead>
-                        <tr><th>ID</th><th>PLACA</th><th>MODEL</th><th>COLOR</th><th>BEGIN</th><th>END</th><th class="text-end">PRICE</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="item in historyList" :key="item.id">
-                            <td>{{ item.id }}</td><td>{{ item.licensePlate }}</td><td>{{ item.vehicleModel }}</td><td>{{ item.vehicleColor }}</td>
-                            <td>{{ formatDate(item.entryTime) }}</td><td>{{ item.exitTime ? formatDate(item.exitTime) : '' }}</td><td class="text-end">{{ item.totalCost?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div v-if="currentView === 'users' && shared.session?.role === 'ADMIN'">
-                <h2>Users <button @click="showAddUser = !showAddUser" class="btn btn-success btn-sm">Add</button></h2>
-                <div v-if="showAddUser" class="card mb-3">
-                    <div class="card-body">
-                        <h5 class="card-title">Add New User</h5>
-                        <div class="mb-3">
-                            <label for="newUserLogin" class="form-label">Username</label>
-                            <input id="newUserLogin" v-model="newUserLogin" class="form-control" required>
+            <!-- Main Content with extra margin -->
+            <div class="container-fluid mx-4">
+                <!-- Parking View -->
+                <div v-if="currentView === 'parking'">
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <h2>Parking</h2>
                         </div>
-                        <div class="mb-3">
-                            <label for="newUserPassword" class="form-label">Password</label>
-                            <input id="newUserPassword" v-model="newUserPassword" type="password" class="form-control" required>
+                        <div class="col-md-4 text-end">
+                            <div class="alert alert-info">
+                                <i class="bi bi-currency-dollar"></i> 
+                                Preço por hora: <strong>R$ {{hourPrice?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}}</strong>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="newUserRole" class="form-label">Role</label>
-                            <select id="newUserRole" v-model="newUserRole" class="form-select" required>
-                                <option value="USER">USER</option>
-                                <option value="ADMIN">ADMIN</option>
-                            </select>
-                        </div>
-                        <button @click="addUser" class="btn btn-primary me-2">Save</button>
-                        <button @click="showAddUser = false" class="btn btn-secondary">Cancel</button>
+                    </div>
+                    
+                    <div class="input-group mb-4">
+                        <span class="input-group-text"><i class="bi bi-car-front-fill"></i></span>
+                        <input type="text" class="form-control" v-model="newPlate" placeholder="Placa">
+                        <input type="text" class="form-control" v-model="newModel" placeholder="Modelo">
+                        <input type="text" class="form-control" v-model="newColor" placeholder="Cor">
+                        <button class="btn btn-primary" @click="addStay"><i class="bi bi-box-arrow-in-down"></i> Entrada</button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>PLACA</th>
+                                    <th>MODELO</th>
+                                    <th>COR</th>
+                                    <th>ENTRADA</th>
+                                    <th class="text-end">PREÇO ATUAL</th>
+                                    <th>AÇÃO</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="item in parkingList" :key="item.id">
+                                    <td><strong>{{ item.licensePlate }}</strong></td>
+                                    <td>{{ item.vehicleModel }}</td>
+                                    <td>{{ item.vehicleColor }}</td>
+                                    <td>{{ formatDateTime(item.entryTime) }}</td>
+                                    <td class="text-end fw-bold text-success">
+                                        {{ getCurrentPrice(item.entryTime).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-success btn-sm" @click="showExitModal(item)">
+                                            <i class="bi bi-box-arrow-up"></i> Saída
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <table class="table">
-                    <thead>
-                        <tr><th>ID</th><th>USERNAME</th><th>ROLE</th><th>COMMANDS</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="user in userList" :key="user.id">
-                            <td>{{ user.id }}</td><td>{{ user.username }}</td><td>{{ user.role }}</td>
-                            <td><button @click="removeUser(user.id)" class="btn btn-danger btn-sm">Remove</button></td>
-                        </tr>
-                    </tbody>
-                </table>
+
+                <!-- History View -->
+                <div v-if="currentView === 'history'">
+                    <h2>Histórico de Estadias</h2>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>PLACA</th>
+                                    <th>MODELO</th>
+                                    <th>COR</th>
+                                    <th>ENTRADA</th>
+                                    <th>SAÍDA</th>
+                                    <th class="text-end">VALOR FINAL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="item in historyList" :key="item.id">
+                                    <td>{{ item.id }}</td>
+                                    <td>{{ item.licensePlate }}</td>
+                                    <td>{{ item.vehicleModel }}</td>
+                                    <td>{{ item.vehicleColor }}</td>
+                                    <td>{{ formatDateTime(item.entryTime) }}</td>
+                                    <td>{{ item.exitTime ? formatDateTime(item.exitTime) : '-' }}</td>
+                                    <td class="text-end fw-bold text-primary">
+                                        {{ item.totalCost?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'R$ 0,00' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Users View (Admin only) -->
+                <div v-if="currentView === 'users' && shared.session?.role === 'ADMIN'">
+                    <h2>Usuários <button @click="showAddUser = !showAddUser" class="btn btn-success btn-sm">+ Adicionar</button></h2>
+                    
+                    <!-- Add User Form -->
+                    <div v-if="showAddUser" class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Novo Usuário</h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Username</label>
+                                    <input v-model="newUserLogin" class="form-control" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Senha</label>
+                                    <input v-model="newUserPassword" type="password" class="form-control" required>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Role</label>
+                                    <select v-model="newUserRole" class="form-select" required>
+                                        <option value="USER">Usuário</option>
+                                        <option value="ADMIN">Administrador</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button @click="addUser" class="btn btn-primary me-2">Salvar</button>
+                            <button @click="showAddUser = false" class="btn btn-secondary">Cancelar</button>
+                        </div>
+                    </div>
+
+                    <!-- Users Table -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>USERNAME</th>
+                                    <th>ROLE</th>
+                                    <th>AÇÕES</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="user in userList" :key="user.id">
+                                    <td>{{ user.id }}</td>
+                                    <td><strong>{{ user.username }}</strong></td>
+                                    <td><span class="badge bg-primary">{{ user.role }}</span></td>
+                                    <td>
+                                        <button @click="removeUser(user.id)" class="btn btn-danger btn-sm">
+                                            <i class="bi bi-trash"></i> Remover
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exit Confirmation Modal -->
+        <div class="modal fade" id="exitModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">
+                            <i class="bi bi-box-arrow-up"></i> Finalizar Estadia
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div v-if="selectedVehicle">
+                            <p class="mb-1"><strong>Placa:</strong> {{ selectedVehicle.licensePlate }}</p>
+                            <p class="mb-1"><strong>Modelo:</strong> {{ selectedVehicle.vehicleModel }}</p>
+                            <p class="mb-1"><strong>Cor:</strong> {{ selectedVehicle.vehicleColor }}</p>
+                            <p class="mb-3"><strong>Entrada:</strong> {{ formatDateTime(selectedVehicle.entryTime) }}</p>
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="h5 mb-0">Valor Final:</span>
+                                <span class="h3 text-success mb-0">
+                                    {{ finalPrice?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}
+                                </span>
+                            </div>
+                            <div class="form-check mt-3">
+                                <input class="form-check-input" type="checkbox" v-model="paymentConfirmed" id="paymentCheck">
+                                <label class="form-check-label" for="paymentCheck">
+                                    Confirmo o recebimento do pagamento
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-success" @click="confirmExit" :disabled="!paymentConfirmed">
+                            <i class="bi bi-check-circle"></i> Confirmar Saída
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -153,7 +264,31 @@
         const shared = reactive({ session: null });
 
         const app = createApp({
-            data() { return { shared, error: null, loginUsername: '', loginPassword: '', data: null, currentView: 'parking', parkingList: [], historyList: [], userList: [], newPlate: '', newModel: '', newColor: '', hourPrice: 0, showAddUser: false, newUserLogin: '', newUserPassword: '', newUserRole: 'USER' }; },
+            data() { 
+                return { 
+                    shared, 
+                    error: null, 
+                    loginUsername: '', 
+                    loginPassword: '', 
+                    data: null, 
+                    currentView: 'parking', 
+                    parkingList: [], 
+                    historyList: [], 
+                    userList: [], 
+                    newPlate: '', 
+                    newModel: '', 
+                    newColor: '', 
+                    hourPrice: 0, 
+                    showAddUser: false, 
+                    newUserLogin: '', 
+                    newUserPassword: '', 
+                    newUserRole: 'USER',
+                    // Modal data
+                    selectedVehicle: null,
+                    finalPrice: 0,
+                    paymentConfirmed: false
+                }; 
+            },
             methods: {
                 async request(url, method, data, token) {
                     const headers = { 'Content-Type': 'application/json' };
@@ -192,33 +327,47 @@
                     }
                 },
                 async loadParking() {
-                    const data = await this.request('/api/parking', 'GET', null, this.shared.session.token);
-                    if (data) { this.parkingList = data.list; this.hourPrice = data.hourPrice; }
+                    const data = await this.request('/api/parking', 'GET', null, this.shared.session?.token);
+                    if (data) { 
+                        this.parkingList = data.list; 
+                        this.hourPrice = data.hourPrice || 5.0;
+                    }
                 },
                 async loadHistory() {
-                    const data = await this.request('/api/parking/history', 'GET', null, this.shared.session.token);
+                    const data = await this.request('/api/parking/history', 'GET', null, this.shared.session?.token);
                     if (data) this.historyList = data.list;
                 },
                 async loadUsers() {
-                    const data = await this.request('/api/admin/users', 'GET', null, this.shared.session.token);
+                    const data = await this.request('/api/admin/users', 'GET', null, this.shared.session?.token);
                     if (data) this.userList = data.users;
                 },
                 async addStay() {
-                    await this.request('/api/parking', 'POST', { plate: this.newPlate, model: this.newModel, color: this.newColor }, this.shared.session.token);
+                    await this.request('/api/parking', 'POST', { plate: this.newPlate, model: this.newModel, color: this.newColor }, this.shared.session?.token);
                     this.newPlate = this.newModel = this.newColor = '';
                     this.loadParking();
                 },
-                async finishStay(id) {
-                    await this.request(`/api/parking/${id}`, 'PUT', null, this.shared.session.token);
+                async showExitModal(vehicle) {
+                    this.selectedVehicle = vehicle;
+                    this.finalPrice = this.getCurrentPrice(vehicle.entryTime);
+                    this.paymentConfirmed = false;
+                    const modal = new bootstrap.Modal(document.getElementById('exitModal'));
+                    modal.show();
+                },
+                async confirmExit() {
+                    if (!this.paymentConfirmed) return;
+                    await this.request(`/api/parking/${this.selectedVehicle.id}`, 'PUT', null, this.shared.session?.token);
                     this.loadParking();
+                    this.loadHistory();
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('exitModal'));
+                    modal.hide();
                 },
                 async addUser() {
-                    await this.request('/api/admin/users', 'POST', { username: this.newUserLogin, password: this.newUserPassword, role: this.newUserRole }, this.shared.session.token);
+                    await this.request('/api/admin/users', 'POST', { username: this.newUserLogin, password: this.newUserPassword, role: this.newUserRole }, this.shared.session?.token);
                     this.showAddUser = false;
                     this.loadUsers();
                 },
                 async removeUser(id) {
-                    await this.request(`/api/admin/users?id=${id}`, 'DELETE', null, this.shared.session.token);
+                    await this.request(`/api/admin/users?id=${id}`, 'DELETE', null, this.shared.session?.token);
                     this.loadUsers();
                 },
                 async logout() {
@@ -235,18 +384,19 @@
                         localStorage.removeItem('token');
                     }
                 },
-                formatDate(dateArray) {
+                formatDateTime(dateArray) {
                     if (!dateArray) return '';
                     const [y, m, d, h, min, s] = dateArray;
                     return `${d.toString().padStart(2, '0')}/${m.toString().padStart(2, '0')}/${y} ${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
                 },
-                getPrice(entryTimeArray) {
+                getCurrentPrice(entryTimeArray) {
                     if (!entryTimeArray) return 0;
                     const [y, m, d, h, min, s, ms] = entryTimeArray;
                     const begin = new Date(y, m - 1, d, h, min, s, ms);
                     const now = new Date();
                     const msDiff = Math.max(0, now - begin);
-                    return this.hourPrice * msDiff / (1000 * 60 * 60);
+                    const hours = msDiff / (1000 * 60 * 60);
+                    return this.hourPrice * hours;
                 }
             },
             watch: {

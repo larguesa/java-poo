@@ -181,7 +181,7 @@ public class Main {
                 if (stay == null) return;
                 HourPrice hp = HourPriceDAO.getHourPrice();
                 double price = hp != null ? hp.getPrice() : 0.0;
-                long hours = java.time.Duration.between(stay.getEntryTime(), LocalDateTime.now()).toHours();
+                double hours = java.time.Duration.between(stay.getEntryTime(), LocalDateTime.now()).toMillis() / (1000.0 * 60 * 60);
                 stay.setExitTime(LocalDateTime.now());
                 stay.setTotalCost(price * hours);
                 VehicleStayDAO.update(stay);
