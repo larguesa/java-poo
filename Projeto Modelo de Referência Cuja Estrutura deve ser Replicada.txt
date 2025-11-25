@@ -1,0 +1,1786 @@
+# Sumário
+
+- **.vscode/settings.json**: MIME: application/json, Considerado (texto)
+- **todo-list/src/main/java/com/example/database/SQLiteConnection.java**: MIME: application/octet-stream, Considerado (texto)
+- **todo-list/src/main/java/com/example/model/Role.java**: MIME: application/octet-stream, Considerado (texto)
+- **todo-list/src/main/java/com/example/model/Task.java**: MIME: application/octet-stream, Considerado (texto)
+- **todo-list/src/main/java/com/example/model/User.java**: MIME: application/octet-stream, Considerado (texto)
+- **todo-list/src/main/java/com/example/repository/TaskRepository.java**: MIME: application/octet-stream, Considerado (texto)
+- **todo-list/src/main/java/com/example/repository/UserRepository.java**: MIME: application/octet-stream, Considerado (texto)
+- **todo-list/src/main/java/com/example/Main.java**: MIME: application/octet-stream, Considerado (texto)
+- **todo-list/src/main/resources/static/index.html**: MIME: text/html, Considerado (texto)
+- **todo-list/src/test/api-test.js**: MIME: text/javascript, Considerado (texto)
+- **todo-list/target/classes/com/example/database/SQLiteConnection.class**: MIME: application/octet-stream, Descartado (não texto)
+- **todo-list/target/classes/com/example/model/Role.class**: MIME: application/octet-stream, Descartado (não texto)
+- **todo-list/target/classes/com/example/model/User.class**: MIME: application/octet-stream, Descartado (não texto)
+- **todo-list/target/classes/com/example/model/Task.class**: MIME: application/octet-stream, Descartado (não texto)
+- **todo-list/target/classes/com/example/repository/TaskRepository.class**: MIME: application/octet-stream, Descartado (não texto)
+- **todo-list/target/classes/com/example/repository/UserRepository.class**: MIME: application/octet-stream, Descartado (não texto)
+- **todo-list/target/classes/com/example/Main.class**: MIME: application/octet-stream, Descartado (não texto)
+- **todo-list/target/classes/static/index.html**: MIME: text/html, Considerado (texto)
+- **todo-list/pom.xml**: MIME: text/xml, Considerado (texto)
+- **tasks.db**: MIME: application/octet-stream, Descartado (não texto)
+
+# Conteúdo
+
+## .vscode/settings.json
+
+{
+    "java.configuration.updateBuildConfiguration": "interactive"
+}
+
+## todo-list/src/main/java/com/example/database/SQLiteConnection.java
+
+package com.example.database;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
+
+public class SQLiteConnection {
+    // String de conexão (cria o arquivo tasks.db na raiz do projeto)
+    private static final String URL = "jdbc:sqlite:tasks.db";
+
+    public static Connection connect() throws Exception {
+        return DriverManager.getConnection(URL);
+    }
+
+    // Método para criar as tabelas se elas não existirem
+    public static void createTables() {
+        String sqlUsers = "CREATE TABLE IF NOT EXISTS users (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "username TEXT UNIQUE NOT NULL, " +
+                        "password TEXT NOT NULL, " +
+                        "role TEXT NOT NULL DEFAULT 'USER', " +
+                        "token TEXT)";
+        String sqlTasks = "CREATE TABLE IF NOT EXISTS tasks (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "title TEXT NOT NULL, " +
+                        "done BOOLEAN DEFAULT FALSE, " +
+                        "userId INTEGER NOT NULL, " +
+                        "FOREIGN KEY (userId) REFERENCES users(id))";
+
+        try (Connection conn = connect(); Statement stmt = conn.createStatement()) {
+            stmt.execute(sqlUsers);
+            stmt.execute(sqlTasks);
+            System.out.println("Tabelas criadas/verif.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+## todo-list/src/main/java/com/example/model/Role.java
+
+package com.example.model;
+
+public enum Role {
+    USER, ADMIN
+}
+
+
+## todo-list/src/main/java/com/example/model/Task.java
+
+package com.example.model;
+
+public class Task {
+    private Integer id;
+    private String title;
+    private boolean done;
+    private Integer userId; // FK para User
+
+    public Task() {}
+
+    public Task(String title, boolean done, Integer userId) {
+        this.title = title;
+        this.done = done;
+        this.userId = userId;
+    }
+
+    // Getters e setters
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public boolean isDone() { return done; }
+    public void setDone(boolean done) { this.done = done; }
+    public Integer getUserId() { return userId; }
+    public void setUserId(Integer userId) { this.userId = userId; }
+
+    @Override
+    public String toString() {
+        return "Task{title='" + title + "', done=" + done + "}";
+    }
+}
+
+## todo-list/src/main/java/com/example/model/User.java
+
+package com.example.model;
+
+public class User {
+    private Integer id;
+    private String username;
+    private String password;
+    private Role role;
+    private String token;
+
+    public User() {}
+
+    public User(String username, String password, Role role) {
+        this.username = username;
+        this.password = password;
+        this.role = role;
+    }
+
+    // Getters e setters para todos os campos
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+    public Role getRole() { return role; }
+    public void setRole(Role role) { this.role = role; }
+    public String getToken() { return token; }
+    public void setToken(String token) { this.token = token; }
+
+    @Override
+    public String toString() {
+        return "User{username='" + username + "', role=" + role + "}";
+    }
+}
+
+## todo-list/src/main/java/com/example/repository/TaskRepository.java
+
+package com.example.repository;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.example.database.SQLiteConnection;
+import com.example.model.Task;
+
+public class TaskRepository {
+
+    /**
+     * Insere uma nova tarefa no banco de dados.
+     * @param task Objeto tarefa preenchido (title, done, userId)
+     * @throws Exception Se houver erro de SQL
+     */
+    public static void add(Task task) throws Exception {
+        String sql = "INSERT INTO tasks(title, done, userId) VALUES(?, ?, ?)";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, task.getTitle());
+            pstmt.setBoolean(2, task.isDone());
+            pstmt.setInt(3, task.getUserId());
+            pstmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Lista tarefas de um usuário específico.
+     * @param userId ID do usuário
+     * @return Lista de Task
+     * @throws Exception Erros de conexão
+     */
+    public static List<Task> getByUserId(int userId) throws Exception {
+        String sql = "SELECT * FROM tasks WHERE userId = ?";
+        List<Task> tasks = new ArrayList<>();
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Task t = new Task();
+                t.setId(rs.getInt("id"));
+                t.setTitle(rs.getString("title"));
+                t.setDone(rs.getBoolean("done"));
+                t.setUserId(rs.getInt("userId"));
+                tasks.add(t);
+            }
+        }
+        return tasks;
+    }
+
+    /**
+     * Lista todas as tarefas (para admin).
+     * @return Lista de Task
+     * @throws Exception Erros de conexão
+     */
+    public static List<Task> getAll() throws Exception {
+        String sql = "SELECT * FROM tasks";
+        List<Task> tasks = new ArrayList<>();
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                Task t = new Task();
+                t.setId(rs.getInt("id"));
+                t.setTitle(rs.getString("title"));
+                t.setDone(rs.getBoolean("done"));
+                t.setUserId(rs.getInt("userId"));
+                tasks.add(t);
+            }
+        }
+        return tasks;
+    }
+
+    /**
+     * Atualiza uma tarefa (title e done).
+     * @param task Objeto tarefa com id preenchido
+     * @throws Exception Erros de conexão
+     */
+    public static void update(Task task) throws Exception {
+        String sql = "UPDATE tasks SET title = ?, done = ? WHERE id = ?";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, task.getTitle());
+            pstmt.setBoolean(2, task.isDone());
+            pstmt.setInt(3, task.getId());
+            pstmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Remove uma tarefa por id.
+     * @param id ID da tarefa
+     * @return true se removeu, false se não encontrou
+     * @throws Exception Erros de conexão
+     */
+    public static boolean delete(int id) throws Exception {
+        String sql = "DELETE FROM tasks WHERE id = ?";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            int affectedRows = pstmt.executeUpdate();
+            return affectedRows > 0;
+        }
+    }
+}
+
+## todo-list/src/main/java/com/example/repository/UserRepository.java
+
+package com.example.repository;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+import org.mindrot.jbcrypt.BCrypt;
+
+import com.example.database.SQLiteConnection;
+import com.example.model.Role;
+import com.example.model.User;
+
+public class UserRepository {
+
+    /**
+     * Insere um novo usuário no banco de dados (com senha hasheada).
+     * @param user Objeto usuário preenchido (username, password, role)
+     * @throws Exception Se houver erro de SQL ou duplicação de username
+     */
+    public static void add(User user) throws Exception {
+        // Hashea a senha antes de salvar
+        String hashedPassword = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt());
+        user.setPassword(hashedPassword); // Atualiza o objeto temporariamente
+
+        String sql = "INSERT INTO users(username, password, role) VALUES(?, ?, ?)";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, user.getUsername());
+            pstmt.setString(2, hashedPassword); // Usa o hash
+            pstmt.setString(3, user.getRole().name());
+            pstmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Remove um usuário pelo nome de usuário.
+     * @param username Nome do usuário a ser removido
+     * @return true se apagou, false se não encontrou
+     * @throws Exception Erros de conexão
+     */
+    public static boolean delete(String username) throws Exception {
+        String sql = "DELETE FROM users WHERE username = ?";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            int affectedRows = pstmt.executeUpdate();
+            return affectedRows > 0;
+        }
+    }
+
+    /**
+     * Valida se o par username/senha existe no banco (compara hashes).
+     * @param username Nome do usuário
+     * @param password Senha em texto plano (será hasheada pra comparação)
+     * @return true se as credenciais forem válidas
+     * @throws Exception Erros de conexão
+     */
+    public static boolean validate(String username, String password) throws Exception {
+        String sql = "SELECT password FROM users WHERE username = ?";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String hashedPassword = rs.getString("password");
+                // Compara a senha entrada com o hash armazenado
+                return BCrypt.checkpw(password, hashedPassword);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Busca um usuário pelo nome de usuário (útil para Sessão).
+     * @param username Nome do usuário
+     * @return User ou null se não encontrado
+     * @throws Exception Erros de conexão
+     */
+    public static User getByUsername(String username) throws Exception {
+        String sql = "SELECT * FROM users WHERE username = ?";
+        User user = null;
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                user = new User();
+                user.setId(rs.getInt("id"));
+                user.setUsername(rs.getString("username"));
+                user.setPassword(rs.getString("password"));
+                user.setRole(Role.valueOf(rs.getString("role"))); // Converte string pra enum
+                user.setToken(rs.getString("token"));
+            }
+        }
+        return user;
+    }
+
+    /**
+     * Atualiza o token de um usuário (usado no login).
+     * @param username Nome do usuário
+     * @param token Token gerado
+     * @throws Exception Erros de conexão
+     */
+    public static void updateToken(String username, String token) throws Exception {
+        String sql = "UPDATE users SET token = ? WHERE username = ?";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, token);
+            pstmt.setString(2, username);
+            pstmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Limpa o token de um usuário.
+     * @param token Token gerado
+     * @throws Exception Erros de conexão
+     */
+    public static void removeToken(String token) throws Exception {
+        String sql = "UPDATE users SET token = '' WHERE token = ?";
+        try (Connection conn = SQLiteConnection.connect();
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, token);
+            pstmt.executeUpdate();
+        }
+    }
+
+    /**
+     * Busca um usuário pelo token (validação de acesso).
+     * @param token Token do usuário
+     * @return User ou null se inválido
+     * @throws Exception Erros de conexão
+     */
+    public static User getUserByToken(String token) throws Exception {
+        String sql = "SELECT * FROM users WHERE token = ?";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, token);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                User u = new User();
+                u.setId(rs.getInt("id"));
+                u.setUsername(rs.getString("username"));
+                u.setRole(Role.valueOf(rs.getString("role")));
+                return u;
+            }
+        }
+        return null; // Token inválido ou não encontrado
+    }
+
+    /**
+     * Lista todos os usuários (para admin).
+     * @return Lista de User (sem senha)
+     * @throws Exception Erros de conexão
+     */
+    public static List<User> getAllUsers() throws Exception {
+        String sql = "SELECT id, username, role FROM users"; // Sem senha por segurança
+        List<User> users = new ArrayList<>();
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                User u = new User();
+                u.setId(rs.getInt("id"));
+                u.setUsername(rs.getString("username"));
+                u.setRole(Role.valueOf(rs.getString("role")));
+                users.add(u);
+            }
+        }
+        return users;
+    }
+}
+
+## todo-list/src/main/java/com/example/Main.java
+
+package com.example;
+
+import com.example.database.SQLiteConnection;
+import com.example.model.Role;
+import com.example.model.Task;
+import com.example.model.User;
+import com.example.repository.TaskRepository;
+import com.example.repository.UserRepository;
+import io.javalin.Javalin;
+import io.javalin.http.staticfiles.Location;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+public class Main {
+    public static void main(String[] args) {
+        SQLiteConnection.createTables();
+
+        // Cria admin padrão se não houver usuários
+        try {
+            List<User> users = UserRepository.getAllUsers();
+            if (users.isEmpty()) {
+                User admin = new User("admin", "admin123", Role.ADMIN);
+                UserRepository.add(admin);
+                System.out.println("Admin padrão criado: username=admin, password=admin123");
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao criar admin padrão: " + e.getMessage());
+        }
+
+        Javalin app = Javalin.create(config -> {
+            // Define o Content-Type padrão para todas as respostas
+            config.http.defaultContentType = "text/plain; charset=UTF-8";
+            
+            // Configura arquivos estáticos se necessário
+            config.staticFiles.add("/static", Location.CLASSPATH);
+
+            // Se estiver usando arquivos estáticos ou templates, verifique também:
+            config.pvt.javaLangErrorHandler((res, error) -> {
+                res.setCharacterEncoding("UTF-8");
+            });
+        }).start(7078);
+
+        app.before("/api/*", ctx -> {
+            try {
+                String token = ctx.header("Authorization");
+                if (token == null || token.isEmpty()) {
+                    ctx.status(401).json(Map.of("error", "Token necessário"));
+                    ctx.skipRemainingHandlers();
+                    return;
+                }
+                User user = UserRepository.getUserByToken(token);
+                if (user == null) {
+                    ctx.status(401).json(Map.of("error", "Token inválido"));
+                    ctx.skipRemainingHandlers();
+                    return;
+                }
+                ctx.attribute("user", user);
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro interno: " + e.getMessage()));
+                ctx.skipRemainingHandlers();
+            }
+        });
+        app.before("/api/admin/*", ctx -> {
+            User user = ctx.attribute("user");
+            if (user == null) {
+                ctx.status(401).json(Map.of("error", "Usuário não autenticado"));
+                ctx.skipRemainingHandlers();
+                return;
+            }
+            if (user.getRole() != Role.ADMIN) {
+                ctx.status(403).json(Map.of("error", "Acesso negado"));
+                ctx.skipRemainingHandlers();
+                return;
+            }
+        });
+        app.post("/login", ctx -> {
+            try {
+                User loginData = ctx.bodyAsClass(User.class);
+                boolean valid = UserRepository.validate(loginData.getUsername(), loginData.getPassword());
+                if (!valid) {
+                    ctx.status(401).json(Map.of("error", "Credenciais inválidas"));
+                    return;
+                }
+                String token = UUID.randomUUID().toString();
+                UserRepository.updateToken(loginData.getUsername(), token);
+                ctx.json(Map.of("token", token));
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro interno: " + e.getMessage()));
+            }
+        });
+        app.put("/logout", ctx -> {
+            try {
+                String token = ctx.header("Authorization");
+                if (token != null) {
+                    UserRepository.removeToken(token);
+                }
+                ctx.json(Map.of("message", "Logout OK"));
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
+        app.get("/api/admin/users", ctx -> {
+            try {
+                List<User> users = UserRepository.getAllUsers();
+                ctx.json(users);
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
+        app.post("/api/admin/users", ctx -> {
+            try {
+                User newUser = ctx.bodyAsClass(User.class);
+                UserRepository.add(newUser);
+                ctx.status(201).json(Map.of("message", "Usuário criado"));
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
+        app.delete("/api/admin/users/{username}", ctx -> {
+            try {
+                String username = ctx.pathParam("username");
+                boolean deleted = UserRepository.delete(username);
+                if (deleted) {
+                    ctx.json(Map.of("message", "Usuário deletado"));
+                } else {
+                    ctx.status(404).json(Map.of("error", "Usuário não encontrado"));
+                }
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
+        app.get("/api/admin/tasks", ctx -> {
+            try {
+                List<Task> tasks = TaskRepository.getAll();
+                ctx.json(tasks);
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
+        app.get("/api/tasks", ctx -> {
+            try {
+                User user = ctx.attribute("user");
+                if (user == null) {
+                    ctx.status(401).json(Map.of("error", "Usuário não autenticado"));
+                    return;
+                }
+                List<Task> tasks = TaskRepository.getByUserId(user.getId());
+                ctx.json(tasks);
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
+        app.post("/api/tasks", ctx -> {
+            try {
+                User user = ctx.attribute("user");
+                if (user == null) {
+                    ctx.status(401).json(Map.of("error", "Usuário não autenticado"));
+                    return;
+                }
+                Task newTask = ctx.bodyAsClass(Task.class);
+                newTask.setUserId(user.getId());
+                newTask.setDone(false);
+                TaskRepository.add(newTask);
+                ctx.status(201).json(Map.of("message", "Tarefa criada"));
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
+        app.put("/api/tasks/{id}", ctx -> {
+            try {
+                User user = ctx.attribute("user");
+                if (user == null) {
+                    ctx.status(401).json(Map.of("error", "Usuário não autenticado"));
+                    return;
+                }
+                int taskId = Integer.parseInt(ctx.pathParam("id"));
+                Task updateTask = ctx.bodyAsClass(Task.class);
+                updateTask.setId(taskId);
+                List<Task> userTasks = TaskRepository.getByUserId(user.getId());
+                boolean owns = userTasks.stream().anyMatch(t -> t.getId().equals(taskId));
+                if (!owns) {
+                    ctx.status(403).json(Map.of("error", "Tarefa não pertence ao usuário"));
+                    return;
+                }
+                TaskRepository.update(updateTask);
+                ctx.json(Map.of("message", "Tarefa atualizada"));
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
+        app.delete("/api/tasks/{id}", ctx -> {
+            try {
+                User user = ctx.attribute("user");
+                if (user == null) {
+                    ctx.status(401).json(Map.of("error", "Usuário não autenticado"));
+                    return;
+                }
+                int taskId = Integer.parseInt(ctx.pathParam("id"));
+                List<Task> userTasks = TaskRepository.getByUserId(user.getId());
+                boolean owns = userTasks.stream().anyMatch(t -> t.getId().equals(taskId));
+                if (!owns) {
+                    ctx.status(403).json(Map.of("error", "Tarefa não pertence ao usuário"));
+                    return;
+                }
+                boolean deleted = TaskRepository.delete(taskId);
+                if (deleted) {
+                    ctx.json(Map.of("message", "Tarefa deletada"));
+                } else {
+                    ctx.status(404).json(Map.of("error", "Tarefa não encontrada"));
+                }
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
+
+        System.out.println("Servidor rodando em http://localhost:7078");
+    }
+}
+
+## todo-list/src/main/resources/static/index.html
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        [x-cloak] { display: none !important; }
+        .done-true { text-decoration: line-through; color: #6c757d; }
+        .cursor-pointer { cursor: pointer; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div x-data="todoApp()" x-init="initApp()" x-cloak>
+
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary" x-show="isLoggedIn">
+            <div class="container">
+                <a class="navbar-brand" href="#">Todo App</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" :class="{ 'active': view === 'tasks' }" href="#" @click.prevent="setView('tasks')">Minhas Tarefas</a>
+                        </li>
+                        <template x-if="isAdmin">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                    Administração
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" @click.prevent="setView('admin_users')">Gerenciar Usuários</a></li>
+                                    <li><a class="dropdown-item" href="#" @click.prevent="setView('admin_tasks')">Todas as Tarefas</a></li>
+                                </ul>
+                            </li>
+                        </template>
+                    </ul>
+                    <div class="d-flex">
+                        <button class="btn btn-outline-light btn-sm" @click="logout()">
+                            <i class="bi bi-box-arrow-right"></i> Sair
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+
+            <div x-show="message.text" class="alert alert-dismissible fade show" :class="'alert-' + message.type" role="alert">
+                <span x-text="message.text"></span>
+                <button type="button" class="btn-close" @click="message.text = ''"></button>
+            </div>
+
+            <div x-show="!isLoggedIn" class="row justify-content-center mt-5">
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow">
+                        <div class="card-body p-4">
+                            <h3 class="text-center mb-4">Login</h3>
+                            <form @submit.prevent="login">
+                                <div class="mb-3">
+                                    <label class="form-label">Usuário</label>
+                                    <input type="text" class="form-control" x-model="loginForm.username" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Senha</label>
+                                    <input type="password" class="form-control" x-model="loginForm.password" required>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">Entrar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="isLoggedIn && view === 'tasks'">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Minhas Tarefas</h5>
+                                <span class="badge bg-primary rounded-pill" x-text="myTasks.length + ' tarefas'"></span>
+                            </div>
+                            <div class="card-body">
+                                <form @submit.prevent="addTask" class="input-group mb-3">
+                                    <input type="text" class="form-control" placeholder="Nova tarefa..." x-model="newTaskTitle" required>
+                                    <button class="btn btn-success" type="submit"><i class="bi bi-plus-lg"></i> Adicionar</button>
+                                </form>
+
+                                <ul class="list-group list-group-flush">
+                                    <template x-for="task in myTasks" :key="task.id">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div class="form-check flex-grow-1">
+                                                <input class="form-check-input cursor-pointer" type="checkbox" 
+                                                       :checked="task.done" @change="toggleTask(task)">
+                                                <label class="form-check-label cursor-pointer" 
+                                                       :class="{ 'done-true': task.done }" 
+                                                       x-text="task.title"
+                                                       @click="toggleTask(task)"></label>
+                                            </div>
+                                            <button class="btn btn-outline-danger btn-sm border-0" @click="deleteTask(task.id)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </li>
+                                    </template>
+                                    <template x-if="myTasks.length === 0">
+                                        <li class="list-group-item text-center text-muted">Nenhuma tarefa encontrada.</li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="isLoggedIn && isAdmin && view === 'admin_users'">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Gerenciar Usuários</h5>
+                        <button class="btn btn-sm btn-primary" @click="showUserModal = true">Novo Usuário</button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Username</th>
+                                        <th>Role</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="user in usersList" :key="user.id">
+                                        <tr>
+                                            <td x-text="user.id"></td>
+                                            <td x-text="user.username"></td>
+                                            <td>
+                                                <span class="badge" :class="user.role === 'ADMIN' ? 'bg-danger' : 'bg-info'" x-text="user.role"></span>
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-danger" @click="deleteUser(user.username)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="showUserModal" class="modal" :class="{ 'd-block': showUserModal }" style="background: rgba(0,0,0,0.5)">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Novo Usuário</h5>
+                                <button type="button" class="btn-close" @click="showUserModal = false"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form @submit.prevent="createUser">
+                                    <div class="mb-3">
+                                        <label class="form-label">Username</label>
+                                        <input type="text" class="form-control" x-model="newUserForm.username" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Senha</label>
+                                        <input type="password" class="form-control" x-model="newUserForm.password" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Permissão</label>
+                                        <select class="form-select" x-model="newUserForm.role">
+                                            <option value="USER">USER</option>
+                                            <option value="ADMIN">ADMIN</option>
+                                        </select>
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="button" class="btn btn-secondary" @click="showUserModal = false">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Salvar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="isLoggedIn && isAdmin && view === 'admin_tasks'">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Todas as Tarefas (Visão Geral)</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Título</th>
+                                        <th>Status</th>
+                                        <th>User ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="task in allTasksList" :key="task.id">
+                                        <tr>
+                                            <td x-text="task.id"></td>
+                                            <td x-text="task.title"></td>
+                                            <td>
+                                                <span class="badge" :class="task.done ? 'bg-success' : 'bg-warning'" 
+                                                      x-text="task.done ? 'Concluído' : 'Pendente'"></span>
+                                            </td>
+                                            <td x-text="task.userId"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        function todoApp() {
+            return {
+                // Estado
+                token: localStorage.getItem('todo_token') || null,
+                isLoggedIn: false,
+                isAdmin: false,
+                view: 'login', // login, tasks, admin_users, admin_tasks
+                message: { text: '', type: 'info' }, // type: success, danger, info
+                
+                // Dados
+                loginForm: { username: '', password: '' },
+                newTaskTitle: '',
+                myTasks: [],
+                usersList: [],
+                allTasksList: [],
+                
+                // Admin Formulário
+                showUserModal: false,
+                newUserForm: { username: '', password: '', role: 'USER' },
+
+                // Inicialização
+                initApp() {
+                    if (this.token) {
+                        this.isLoggedIn = true;
+                        this.fetchMyTasks();
+                        this.checkAdminRole();
+                    }
+                },
+
+                // Navegação
+                setView(viewName) {
+                    this.view = viewName;
+                    this.message.text = '';
+                    if (viewName === 'tasks') this.fetchMyTasks();
+                    if (viewName === 'admin_users') this.fetchUsers();
+                    if (viewName === 'admin_tasks') this.fetchAllTasks();
+                },
+
+                // Helper para Fetch com Auth
+                async authFetch(url, options = {}) {
+                    const headers = {
+                        'Content-Type': 'application/json',
+                        'Authorization': this.token
+                    };
+                    const response = await fetch(url, { ...options, headers });
+                    
+                    if (response.status === 401) {
+                        this.logout();
+                        throw new Error('Sessão expirada');
+                    }
+                    return response;
+                },
+
+                // Autenticação
+                async login() {
+                    try {
+                        const res = await fetch('/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.loginForm)
+                        });
+                        
+                        const data = await res.json();
+                        
+                        if (res.ok) {
+                            this.token = data.token;
+                            localStorage.setItem('todo_token', this.token);
+                            this.isLoggedIn = true;
+                            this.loginForm = { username: '', password: '' };
+                            
+                            // Tenta verificar se é admin e carrega tarefas
+                            await this.checkAdminRole();
+                            this.setView('tasks');
+                        } else {
+                            this.showMessage(data.error || 'Erro no login', 'danger');
+                        }
+                    } catch (e) {
+                        this.showMessage('Erro de conexão', 'danger');
+                    }
+                },
+
+                logout() {
+                    // Opcional: Chamar API de logout
+                    if (this.token) {
+                        fetch('/logout', { method: 'PUT', headers: { 'Authorization': this.token } });
+                    }
+                    this.token = null;
+                    this.isLoggedIn = false;
+                    this.isAdmin = false;
+                    this.myTasks = [];
+                    localStorage.removeItem('todo_token');
+                    this.view = 'login';
+                },
+
+                // Verifica se o usuário é admin tentando acessar um endpoint restrito
+                async checkAdminRole() {
+                    try {
+                        // Tenta pegar usuários. Se conseguir (200), é admin. Se 403, é user.
+                        const res = await this.authFetch('/api/admin/users');
+                        if (res.ok) {
+                            this.isAdmin = true;
+                        } else {
+                            this.isAdmin = false;
+                        }
+                    } catch (e) {
+                        this.isAdmin = false;
+                    }
+                },
+
+                // Lógica de Tarefas (Usuário Comum)
+                async fetchMyTasks() {
+                    try {
+                        const res = await this.authFetch('/api/tasks');
+                        if (res.ok) {
+                            this.myTasks = await res.json();
+                        }
+                    } catch (e) { console.error(e); }
+                },
+
+                async addTask() {
+                    if (!this.newTaskTitle.trim()) return;
+                    try {
+                        const res = await this.authFetch('/api/tasks', {
+                            method: 'POST',
+                            body: JSON.stringify({ title: this.newTaskTitle })
+                        });
+                        if (res.ok) {
+                            this.newTaskTitle = '';
+                            this.fetchMyTasks();
+                        }
+                    } catch (e) {
+                        this.showMessage('Erro ao criar tarefa', 'danger');
+                    }
+                },
+
+                async toggleTask(task) {
+                    // O backend pede o objeto task completo ou parcial na atualização
+                    const updatedStatus = !task.done;
+                    try {
+                        // Atualização otimista na UI
+                        task.done = updatedStatus;
+                        
+                        const res = await this.authFetch(`/api/tasks/${task.id}`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ 
+                                title: task.title, 
+                                done: updatedStatus 
+                            })
+                        });
+                        
+                        if (!res.ok) {
+                            task.done = !updatedStatus; // Reverte em caso de erro
+                            const data = await res.json();
+                            this.showMessage(data.error, 'danger');
+                        }
+                    } catch (e) {
+                        task.done = !updatedStatus;
+                    }
+                },
+
+                async deleteTask(id) {
+                    if (!confirm('Tem certeza?')) return;
+                    try {
+                        const res = await this.authFetch(`/api/tasks/${id}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            this.myTasks = this.myTasks.filter(t => t.id !== id);
+                        }
+                    } catch (e) {
+                        this.showMessage('Erro ao deletar', 'danger');
+                    }
+                },
+
+                // Lógica de Admin
+                async fetchUsers() {
+                    try {
+                        const res = await this.authFetch('/api/admin/users');
+                        if (res.ok) this.usersList = await res.json();
+                    } catch (e) { this.showMessage('Acesso negado aos usuários', 'danger'); }
+                },
+
+                async createUser() {
+                    try {
+                        const res = await this.authFetch('/api/admin/users', {
+                            method: 'POST',
+                            body: JSON.stringify(this.newUserForm)
+                        });
+                        if (res.ok) {
+                            this.showUserModal = false;
+                            this.newUserForm = { username: '', password: '', role: 'USER' };
+                            this.fetchUsers();
+                            this.showMessage('Usuário criado com sucesso', 'success');
+                        } else {
+                            const data = await res.json();
+                            this.showMessage(data.error || 'Erro ao criar usuário', 'danger');
+                        }
+                    } catch (e) { this.showMessage('Erro interno', 'danger'); }
+                },
+
+                async deleteUser(username) {
+                    if (!confirm(`Remover usuário ${username}?`)) return;
+                    try {
+                        const res = await this.authFetch(`/api/admin/users/${username}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            this.fetchUsers();
+                        } else {
+                            this.showMessage('Erro ao deletar usuário', 'danger');
+                        }
+                    } catch (e) { console.error(e); }
+                },
+
+                async fetchAllTasks() {
+                    try {
+                        const res = await this.authFetch('/api/admin/tasks');
+                        if (res.ok) this.allTasksList = await res.json();
+                    } catch (e) { this.showMessage('Erro ao buscar tarefas', 'danger'); }
+                },
+
+                // Utilitários
+                showMessage(text, type) {
+                    this.message = { text, type };
+                    setTimeout(() => this.message.text = '', 3000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+
+## todo-list/src/test/api-test.js
+
+// Base URL do servidor
+const baseUrl = 'http://localhost:7078';
+
+// Helper para fetch com token
+function fetchWithToken(url, options = {}, token = null) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = token;
+    return fetch(url, { ...options, headers });
+}
+
+// Helper para parse response (sempre JSON agora)
+async function parseResponse(response) {
+    return await response.json();
+}
+
+// Helper para log
+function log(msg) { console.log(msg); }
+
+// Testes
+async function runTests() {
+    log('Iniciando testes API...');
+    
+    // 1. Login admin (password hasheada, mas envia plain)
+    log('1. Login admin...');
+    let response = await fetchWithToken(`${baseUrl}/login`, {
+        method: 'POST',
+        body: JSON.stringify({ username: 'admin', password: 'admin123' })
+    });
+    let data = await parseResponse(response);
+    log(`Login admin: ${response.status} - ${JSON.stringify(data)}`);
+    const adminToken = response.ok ? data.token : null;
+    
+    // 2. Logout admin (se logado)
+    if (adminToken) {
+        log('2. Logout admin...');
+        response = await fetchWithToken(`${baseUrl}/logout`, {
+            method: 'PUT'
+        }, adminToken);
+        data = await parseResponse(response);
+        log(`Logout admin: ${response.status} - ${JSON.stringify(data)}`);
+    }
+    
+    // 3. Login de novo para continuar testes
+    log('3. Login admin novamente...');
+    response = await fetchWithToken(`${baseUrl}/login`, {
+        method: 'POST',
+        body: JSON.stringify({ username: 'admin', password: 'admin123' })
+    });
+    data = await parseResponse(response);
+    log(`Login admin: ${response.status} - ${JSON.stringify(data)}`);
+    const newToken = response.ok ? data.token : null;
+    
+    if (!newToken) {
+        log('Falha no login, abortando.');
+        return;
+    }
+    
+    // 4. Criar user admin (via admin)
+    log('4. Criar user teste...');
+    response = await fetchWithToken(`${baseUrl}/api/admin/users`, {
+        method: 'POST',
+        body: JSON.stringify({ username: 'teste', password: '123456', role: 'USER' })
+    }, newToken);
+    data = await parseResponse(response);
+    log(`Criar user: ${response.status} - ${JSON.stringify(data)}`);
+    
+    // 5. Listar users admin
+    log('5. Listar users...');
+    response = await fetchWithToken(`${baseUrl}/api/admin/users`, {}, newToken);
+    data = await parseResponse(response);
+    log(`Listar users: ${response.status} - ${JSON.stringify(data)}`);
+    
+    // 6. Login como user teste
+    log('6. Login user teste...');
+    response = await fetchWithToken(`${baseUrl}/login`, {
+        method: 'POST',
+        body: JSON.stringify({ username: 'teste', password: '123456' })
+    });
+    data = await parseResponse(response);
+    log(`Login teste: ${response.status} - ${JSON.stringify(data)}`);
+    const userToken = response.ok ? data.token : null;
+    
+    if (!userToken) {
+        log('Falha no login user, abortando.');
+        return;
+    }
+    
+    // 7. Criar task para user
+    log('7. Criar task...');
+    response = await fetchWithToken(`${baseUrl}/api/tasks`, {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Tarefa de teste' })
+    }, userToken);
+    data = await parseResponse(response);
+    log(`Criar task: ${response.status} - ${JSON.stringify(data)}`);
+    
+    // 8. Listar tasks do user
+    log('8. Listar tasks...');
+    response = await fetchWithToken(`${baseUrl}/api/tasks`, {}, userToken);
+    data = await parseResponse(response);
+    log(`Listar tasks: ${response.status} - ${JSON.stringify(data)}`);
+    const taskId = data.length > 0 ? data[0].id : null;
+    
+    if (taskId) {
+        // 9. Atualizar task
+        log('9. Atualizar task...');
+        response = await fetchWithToken(`${baseUrl}/api/tasks/${taskId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ title: 'Tarefa atualizada', done: true })
+        }, userToken);
+        data = await parseResponse(response);
+        log(`Atualizar task: ${response.status} - ${JSON.stringify(data)}`);
+        
+        // 10. Deletar task
+        log('10. Deletar task...');
+        response = await fetchWithToken(`${baseUrl}/api/tasks/${taskId}`, {
+            method: 'DELETE'
+        }, userToken);
+        data = await parseResponse(response);
+        log(`Deletar task: ${response.status} - ${JSON.stringify(data)}`);
+    }
+    
+    // 11. Logout user
+    log('11. Logout user...');
+    response = await fetchWithToken(`${baseUrl}/logout`, {
+        method: 'PUT'
+    }, userToken);
+    data = await parseResponse(response);
+    log(`Logout user: ${response.status} - ${JSON.stringify(data)}`);
+    
+    // 12. Deletar user teste (via admin)
+    log('12. Deletar user teste...');
+    response = await fetchWithToken(`${baseUrl}/api/admin/users/teste`, {
+        method: 'DELETE'
+    }, newToken);
+    data = await parseResponse(response);
+    log(`Deletar user: ${response.status} - ${JSON.stringify(data)}`);
+    
+    // 13. Logout admin final
+    log('13. Logout admin final...');
+    response = await fetchWithToken(`${baseUrl}/logout`, {
+        method: 'PUT'
+    }, newToken);
+    data = await parseResponse(response);
+    log(`Logout admin: ${response.status} - ${JSON.stringify(data)}`);
+    
+    log('Testes finalizados.');
+}
+
+// Executar
+runTests().catch(err => log('Erro nos testes: ' + err));
+
+## todo-list/target/classes/static/index.html
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        [x-cloak] { display: none !important; }
+        .done-true { text-decoration: line-through; color: #6c757d; }
+        .cursor-pointer { cursor: pointer; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div x-data="todoApp()" x-init="initApp()" x-cloak>
+
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary" x-show="isLoggedIn">
+            <div class="container">
+                <a class="navbar-brand" href="#">Todo App</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" :class="{ 'active': view === 'tasks' }" href="#" @click.prevent="setView('tasks')">Minhas Tarefas</a>
+                        </li>
+                        <template x-if="isAdmin">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                    Administração
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" @click.prevent="setView('admin_users')">Gerenciar Usuários</a></li>
+                                    <li><a class="dropdown-item" href="#" @click.prevent="setView('admin_tasks')">Todas as Tarefas</a></li>
+                                </ul>
+                            </li>
+                        </template>
+                    </ul>
+                    <div class="d-flex">
+                        <button class="btn btn-outline-light btn-sm" @click="logout()">
+                            <i class="bi bi-box-arrow-right"></i> Sair
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+
+            <div x-show="message.text" class="alert alert-dismissible fade show" :class="'alert-' + message.type" role="alert">
+                <span x-text="message.text"></span>
+                <button type="button" class="btn-close" @click="message.text = ''"></button>
+            </div>
+
+            <div x-show="!isLoggedIn" class="row justify-content-center mt-5">
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow">
+                        <div class="card-body p-4">
+                            <h3 class="text-center mb-4">Login</h3>
+                            <form @submit.prevent="login">
+                                <div class="mb-3">
+                                    <label class="form-label">Usuário</label>
+                                    <input type="text" class="form-control" x-model="loginForm.username" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Senha</label>
+                                    <input type="password" class="form-control" x-model="loginForm.password" required>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">Entrar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="isLoggedIn && view === 'tasks'">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Minhas Tarefas</h5>
+                                <span class="badge bg-primary rounded-pill" x-text="myTasks.length + ' tarefas'"></span>
+                            </div>
+                            <div class="card-body">
+                                <form @submit.prevent="addTask" class="input-group mb-3">
+                                    <input type="text" class="form-control" placeholder="Nova tarefa..." x-model="newTaskTitle" required>
+                                    <button class="btn btn-success" type="submit"><i class="bi bi-plus-lg"></i> Adicionar</button>
+                                </form>
+
+                                <ul class="list-group list-group-flush">
+                                    <template x-for="task in myTasks" :key="task.id">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div class="form-check flex-grow-1">
+                                                <input class="form-check-input cursor-pointer" type="checkbox" 
+                                                       :checked="task.done" @change="toggleTask(task)">
+                                                <label class="form-check-label cursor-pointer" 
+                                                       :class="{ 'done-true': task.done }" 
+                                                       x-text="task.title"
+                                                       @click="toggleTask(task)"></label>
+                                            </div>
+                                            <button class="btn btn-outline-danger btn-sm border-0" @click="deleteTask(task.id)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </li>
+                                    </template>
+                                    <template x-if="myTasks.length === 0">
+                                        <li class="list-group-item text-center text-muted">Nenhuma tarefa encontrada.</li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="isLoggedIn && isAdmin && view === 'admin_users'">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Gerenciar Usuários</h5>
+                        <button class="btn btn-sm btn-primary" @click="showUserModal = true">Novo Usuário</button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Username</th>
+                                        <th>Role</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="user in usersList" :key="user.id">
+                                        <tr>
+                                            <td x-text="user.id"></td>
+                                            <td x-text="user.username"></td>
+                                            <td>
+                                                <span class="badge" :class="user.role === 'ADMIN' ? 'bg-danger' : 'bg-info'" x-text="user.role"></span>
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-danger" @click="deleteUser(user.username)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="showUserModal" class="modal" :class="{ 'd-block': showUserModal }" style="background: rgba(0,0,0,0.5)">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Novo Usuário</h5>
+                                <button type="button" class="btn-close" @click="showUserModal = false"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form @submit.prevent="createUser">
+                                    <div class="mb-3">
+                                        <label class="form-label">Username</label>
+                                        <input type="text" class="form-control" x-model="newUserForm.username" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Senha</label>
+                                        <input type="password" class="form-control" x-model="newUserForm.password" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Permissão</label>
+                                        <select class="form-select" x-model="newUserForm.role">
+                                            <option value="USER">USER</option>
+                                            <option value="ADMIN">ADMIN</option>
+                                        </select>
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="button" class="btn btn-secondary" @click="showUserModal = false">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Salvar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="isLoggedIn && isAdmin && view === 'admin_tasks'">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Todas as Tarefas (Visão Geral)</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Título</th>
+                                        <th>Status</th>
+                                        <th>User ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="task in allTasksList" :key="task.id">
+                                        <tr>
+                                            <td x-text="task.id"></td>
+                                            <td x-text="task.title"></td>
+                                            <td>
+                                                <span class="badge" :class="task.done ? 'bg-success' : 'bg-warning'" 
+                                                      x-text="task.done ? 'Concluído' : 'Pendente'"></span>
+                                            </td>
+                                            <td x-text="task.userId"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        function todoApp() {
+            return {
+                // Estado
+                token: localStorage.getItem('todo_token') || null,
+                isLoggedIn: false,
+                isAdmin: false,
+                view: 'login', // login, tasks, admin_users, admin_tasks
+                message: { text: '', type: 'info' }, // type: success, danger, info
+                
+                // Dados
+                loginForm: { username: '', password: '' },
+                newTaskTitle: '',
+                myTasks: [],
+                usersList: [],
+                allTasksList: [],
+                
+                // Admin Formulário
+                showUserModal: false,
+                newUserForm: { username: '', password: '', role: 'USER' },
+
+                // Inicialização
+                initApp() {
+                    if (this.token) {
+                        this.isLoggedIn = true;
+                        this.fetchMyTasks();
+                        this.checkAdminRole();
+                    }
+                },
+
+                // Navegação
+                setView(viewName) {
+                    this.view = viewName;
+                    this.message.text = '';
+                    if (viewName === 'tasks') this.fetchMyTasks();
+                    if (viewName === 'admin_users') this.fetchUsers();
+                    if (viewName === 'admin_tasks') this.fetchAllTasks();
+                },
+
+                // Helper para Fetch com Auth
+                async authFetch(url, options = {}) {
+                    const headers = {
+                        'Content-Type': 'application/json',
+                        'Authorization': this.token
+                    };
+                    const response = await fetch(url, { ...options, headers });
+                    
+                    if (response.status === 401) {
+                        this.logout();
+                        throw new Error('Sessão expirada');
+                    }
+                    return response;
+                },
+
+                // Autenticação
+                async login() {
+                    try {
+                        const res = await fetch('/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.loginForm)
+                        });
+                        
+                        const data = await res.json();
+                        
+                        if (res.ok) {
+                            this.token = data.token;
+                            localStorage.setItem('todo_token', this.token);
+                            this.isLoggedIn = true;
+                            this.loginForm = { username: '', password: '' };
+                            
+                            // Tenta verificar se é admin e carrega tarefas
+                            await this.checkAdminRole();
+                            this.setView('tasks');
+                        } else {
+                            this.showMessage(data.error || 'Erro no login', 'danger');
+                        }
+                    } catch (e) {
+                        this.showMessage('Erro de conexão', 'danger');
+                    }
+                },
+
+                logout() {
+                    // Opcional: Chamar API de logout
+                    if (this.token) {
+                        fetch('/logout', { method: 'PUT', headers: { 'Authorization': this.token } });
+                    }
+                    this.token = null;
+                    this.isLoggedIn = false;
+                    this.isAdmin = false;
+                    this.myTasks = [];
+                    localStorage.removeItem('todo_token');
+                    this.view = 'login';
+                },
+
+                // Verifica se o usuário é admin tentando acessar um endpoint restrito
+                async checkAdminRole() {
+                    try {
+                        // Tenta pegar usuários. Se conseguir (200), é admin. Se 403, é user.
+                        const res = await this.authFetch('/api/admin/users');
+                        if (res.ok) {
+                            this.isAdmin = true;
+                        } else {
+                            this.isAdmin = false;
+                        }
+                    } catch (e) {
+                        this.isAdmin = false;
+                    }
+                },
+
+                // Lógica de Tarefas (Usuário Comum)
+                async fetchMyTasks() {
+                    try {
+                        const res = await this.authFetch('/api/tasks');
+                        if (res.ok) {
+                            this.myTasks = await res.json();
+                        }
+                    } catch (e) { console.error(e); }
+                },
+
+                async addTask() {
+                    if (!this.newTaskTitle.trim()) return;
+                    try {
+                        const res = await this.authFetch('/api/tasks', {
+                            method: 'POST',
+                            body: JSON.stringify({ title: this.newTaskTitle })
+                        });
+                        if (res.ok) {
+                            this.newTaskTitle = '';
+                            this.fetchMyTasks();
+                        }
+                    } catch (e) {
+                        this.showMessage('Erro ao criar tarefa', 'danger');
+                    }
+                },
+
+                async toggleTask(task) {
+                    // O backend pede o objeto task completo ou parcial na atualização
+                    const updatedStatus = !task.done;
+                    try {
+                        // Atualização otimista na UI
+                        task.done = updatedStatus;
+                        
+                        const res = await this.authFetch(`/api/tasks/${task.id}`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ 
+                                title: task.title, 
+                                done: updatedStatus 
+                            })
+                        });
+                        
+                        if (!res.ok) {
+                            task.done = !updatedStatus; // Reverte em caso de erro
+                            const data = await res.json();
+                            this.showMessage(data.error, 'danger');
+                        }
+                    } catch (e) {
+                        task.done = !updatedStatus;
+                    }
+                },
+
+                async deleteTask(id) {
+                    if (!confirm('Tem certeza?')) return;
+                    try {
+                        const res = await this.authFetch(`/api/tasks/${id}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            this.myTasks = this.myTasks.filter(t => t.id !== id);
+                        }
+                    } catch (e) {
+                        this.showMessage('Erro ao deletar', 'danger');
+                    }
+                },
+
+                // Lógica de Admin
+                async fetchUsers() {
+                    try {
+                        const res = await this.authFetch('/api/admin/users');
+                        if (res.ok) this.usersList = await res.json();
+                    } catch (e) { this.showMessage('Acesso negado aos usuários', 'danger'); }
+                },
+
+                async createUser() {
+                    try {
+                        const res = await this.authFetch('/api/admin/users', {
+                            method: 'POST',
+                            body: JSON.stringify(this.newUserForm)
+                        });
+                        if (res.ok) {
+                            this.showUserModal = false;
+                            this.newUserForm = { username: '', password: '', role: 'USER' };
+                            this.fetchUsers();
+                            this.showMessage('Usuário criado com sucesso', 'success');
+                        } else {
+                            const data = await res.json();
+                            this.showMessage(data.error || 'Erro ao criar usuário', 'danger');
+                        }
+                    } catch (e) { this.showMessage('Erro interno', 'danger'); }
+                },
+
+                async deleteUser(username) {
+                    if (!confirm(`Remover usuário ${username}?`)) return;
+                    try {
+                        const res = await this.authFetch(`/api/admin/users/${username}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            this.fetchUsers();
+                        } else {
+                            this.showMessage('Erro ao deletar usuário', 'danger');
+                        }
+                    } catch (e) { console.error(e); }
+                },
+
+                async fetchAllTasks() {
+                    try {
+                        const res = await this.authFetch('/api/admin/tasks');
+                        if (res.ok) this.allTasksList = await res.json();
+                    } catch (e) { this.showMessage('Erro ao buscar tarefas', 'danger'); }
+                },
+
+                // Utilitários
+                showMessage(text, type) {
+                    this.message = { text, type };
+                    setTimeout(() => this.message.text = '', 3000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+
+## todo-list/pom.xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>todo-list</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>19</maven.compiler.source>
+        <maven.compiler.target>19</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <!-- https://mvnrepository.com/artifact/io.javalin/javalin-bundle -->
+        <dependency>
+            <groupId>io.javalin</groupId>
+            <artifactId>javalin-bundle</artifactId>
+            <version>6.7.0</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.xerial/sqlite-jdbc -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.51.0.0</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.mindrot/jbcrypt -->
+        <dependency>
+            <groupId>org.mindrot</groupId>
+            <artifactId>jbcrypt</artifactId>
+            <version>0.4</version>
+        </dependency>
+    </dependencies>
+
+</project>

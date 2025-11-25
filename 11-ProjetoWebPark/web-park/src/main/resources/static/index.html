@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WebParking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <script src="https://unpkg.com/vue@next"></script>
+</head>
+<body>
+    <div id="session">
+        <nav v-if="data" class="navbar navbar-expand-lg bg-body-tertiary">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#"><i class="bi bi-p-square"></i>&nbsp;WebParking</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarText">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" @click="currentView = 'parking'">Parking</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" @click="currentView = 'history'">History</a>
+                        </li>
+                        <li class="nav-item" v-if="data.role === 'ADMIN'">
+                            <a class="nav-link" href="#" @click="currentView = 'users'">Users</a>
+                        </li>
+                    </ul>
+                    <span class="navbar-text">
+                        <i class="bi bi-person"></i>{{data.name || data.username}}
+                        <button @click="logout()" class="btn btn-sm btn-danger"><i class="bi bi-arrow-right-circle"></i></button>
+                    </span>
+                </div>
+            </div>
+        </nav>
+        <div v-else class="card m-2">
+            <div class="card-header">
+                <h1><i class="bi bi-p-square"></i>&nbsp;WebParking authentication</h1>
+            </div>
+            <div class="card-body">
+                <form>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input v-model="loginUsername" type="text" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input v-model="loginPassword" type="password" class="form-control">
+                    </div>
+                    <button @click="login()" type="submit" class="btn btn-primary">Login</button>
+                </form>
+            </div>
+        </div>
+        <div v-if="error && error!=='No session'" class="alert alert-danger m-2">{{error}}</div>
+    </div>
+
+    <div id="app" class="container-fluid m-2" v-if="shared.session">
+        <div v-if="currentView === 'parking'">
+            <h2>Parking</h2>
+            <div class="input-group mb-3">
+                <span class="input-group-text"><i class="bi bi-car-front-fill"></i></span>
+                <input type="text" class="form-control" v-model="newPlate" placeholder="Plate">
+                <input type="text" class="form-control" v-model="newModel" placeholder="Model">
+                <input type="text" class="form-control" v-model="newColor" placeholder="Color">
+                <button class="btn btn-primary" @click="addStay"><i class="bi bi-box-arrow-in-down"></i></button>
+            </div>
+            <table class="table">
+                <tr>
+                    <th>PLACA</th><th>MODEL</th><th>COLOR</th><th>BEGIN</th><th class="text-end">PRICE</th><th>EXIT</th>
+                </tr>
+                <tr v-for="item in parkingList" :key="item.id">
+                    <td>{{ item.vehiclePlate }}</td>
+                    <td>{{ item.vehicleModel }}</td>
+                    <td>{{ item.vehicleColor }}</td>
+                    <td>{{ item.beginStay }}</td>
+                    <td class="text-end">{{ getPrice(item.beginStay).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}</td>
+                    <td><button @click="finishStay(item.id)" class="btn btn-success btn-sm"><i class="bi bi-box-arrow-up"></i> Exit</button></td>
+                </tr>
+            </table>
+        </div>
+
+        <div v-if="currentView === 'history'">
+            <h2>Parking History</h2>
+            <table class="table">
+                <tr><th>ID</th><th>PLACA</th><th>MODEL</th><th>COLOR</th><th>BEGIN</th><th>END</th><th class="text-end">PRICE</th></tr>
+                <tr v-for="item in historyList" :key="item.id">
+                    <td>{{ item.id }}</td><td>{{ item.vehiclePlate }}</td><td>{{ item.vehicleModel }}</td><td>{{ item.vehicleColor }}</td>
+                    <td>{{ item.beginStay }}</td><td>{{ item.endStay }}</td><td class="text-end">{{item.price?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div v-if="currentView === 'users' && shared.session.role === 'ADMIN'">
+            <h2>Users <button @click="showAddUser = !showAddUser" class="btn btn-success btn-sm">Add</button></h2>
+            <div v-if="showAddUser" class="mb-3">
+                <input v-model="newUserLogin" placeholder="Login" class="form-control mb-2">
+                <input v-model="newUserName" placeholder="Name" class="form-control mb-2">
+                <input v-model="newUserPassword" type="password" placeholder="Password" class="form-control mb-2">
+                <select v-model="newUserRole" class="form-control mb-2"><option value="USER">USER</option><option value="ADMIN">ADMIN</option></select>
+                <button @click="addUser" class="btn btn-primary">Save</button>
+            </div>
+            <table class="table">
+                <tr><th>ID</th><th>LOGIN</th><th>NAME</th><th>ROLE</th><th>COMMANDS</th></tr>
+                <tr v-for="user in userList" :key="user.id">
+                    <td>{{ user.id }}</td><td>{{ user.login }}</td><td>{{ user.name }}</td><td>{{ user.role }}</td>
+                    <td><button @click="removeUser(user.id)" class="btn btn-danger btn-sm">Remove</button></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const shared = Vue.reactive({ session: null });
+        
+        const session = Vue.createApp({
+            data() { return { shared, error: null, loginUsername: '', loginPassword: '', data: null }; },
+            methods: {
+                async request(url, method, data, token) {
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (token) headers['Authorization'] = token;
+                    const response = await fetch(url, { method, headers, body: data ? JSON.stringify(data) : null });
+                    if (response.ok) return response.json();
+                    this.error = response.statusText;
+                    return null;
+                },
+                async loadSession() {
+                    const data = await this.request('/api/session', 'GET');
+                    if (data) { this.data = data; this.error = null; this.shared.session = this.data; }
+                },
+                async login() {
+                    const data = await this.request('/login', 'POST', { username: this.loginUsername, password: this.loginPassword });
+                    if (data) { this.data = data; this.error = null; this.shared.session = this.data; }
+                },
+                async logout() {
+                    await this.request('/logout', 'PUT', null, this.data.token);
+                    this.data = null; this.shared.session = null;
+                }
+            },
+            mounted() { this.loadSession(); }
+        });
+        session.mount('#session');
+
+        const app = Vue.createApp({
+            data() { return { shared, currentView: 'parking', parkingList: [], historyList: [], userList: [], newPlate: '', newModel: '', newColor: '', hourPrice: 0, showAddUser: false, newUserLogin: '', newUserName: '', newUserPassword: '', newUserRole: 'USER' }; },
+            methods: {
+                async request(url, method, data) {
+                    const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': this.shared.session.token }, body: data ? JSON.stringify(data) : null });
+                    return response.ok ? response.json() : null;
+                },
+                async loadParking() {
+                    const data = await this.request('/api/parking', 'GET');
+                    if (data) { this.parkingList = data.list; this.hourPrice = data.hourPrice; }
+                },
+                async loadHistory() {
+                    const data = await this.request('/api/parking/history', 'GET');
+                    if (data) this.historyList = data.list;
+                },
+                async loadUsers() {
+                    const data = await this.request('/api/admin/users', 'GET');
+                    if (data) this.userList = data.users;
+                },
+                async addStay() {
+                    await this.request('/api/parking', 'POST', { plate: this.newPlate, model: this.newModel, color: this.newColor });
+                    this.newPlate = this.newModel = this.newColor = '';
+                    this.loadParking();
+                },
+                async finishStay(id) {
+                    await this.request(`/api/parking/${id}`, 'PUT');
+                    this.loadParking();
+                },
+                async addUser() {
+                    await this.request('/api/admin/users', 'POST', { username: this.newUserLogin, name: this.newUserName, password: this.newUserPassword, role: this.newUserRole });
+                    this.showAddUser = false;
+                    this.loadUsers();
+                },
+                async removeUser(id) {
+                    await this.request(`/api/admin/users?id=${id}`, 'DELETE');
+                    this.loadUsers();
+                },
+                getPrice(beginStay) {
+                    const begin = new Date(beginStay);
+                    const now = new Date();
+                    const ms = now - begin;
+                    return this.hourPrice * ms / 60 / 60 / 1000;
+                }
+            },
+            watch: {
+                currentView(newView) {
+                    if (newView === 'parking') this.loadParking();
+                    else if (newView === 'history') this.loadHistory();
+                    else if (newView === 'users') this.loadUsers();
+                }
+            },
+            mounted() { this.loadParking(); }
+        });
+        app.mount('#app');
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
