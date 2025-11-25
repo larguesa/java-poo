@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.json.JSONObject;
 
@@ -86,7 +87,18 @@ public class Main {
             }
         });
 
-        app.get("/", ctx -> ctx.redirect("/static/index.html"));
+        app.get("/api/session", ctx -> {
+            try {
+                User user = ctx.attribute("user");
+                if (user != null) {
+                    ctx.json(Map.of("username", user.getUsername(), "role", user.getRole().name()));
+                } else {
+                    ctx.status(401).json(Map.of("error", "No session"));
+                }
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
+            }
+        });
 
         app.post("/login", ctx -> {
             try {
@@ -108,7 +120,7 @@ public class Main {
             try {
                 String token = ctx.header("Authorization");
                 if (token != null) {
-                    UserDAO.updateToken("", token); // Limpa token
+                    UserDAO.clearToken(token);
                 }
                 ctx.json(Map.of("message", "Logout OK"));
             } catch (Exception e) {
@@ -123,7 +135,7 @@ public class Main {
                     ctx.status(401).json(Map.of("error", "Usuário não autenticado"));
                     return;
                 }
-                List<VehicleStay> stays = VehicleStayDAO.getByUserId(user.getId());
+                List<VehicleStay> stays = VehicleStayDAO.getAll().stream().filter(s -> s.getExitTime() == null).collect(Collectors.toList());
                 HourPrice hp = HourPriceDAO.getHourPrice();
                 ctx.json(Map.of("list", stays, "hourPrice", hp != null ? hp.getPrice() : 0.0));
             } catch (Exception e) {
@@ -186,8 +198,8 @@ public class Main {
                     ctx.status(401).json(Map.of("error", "Usuário não autenticado"));
                     return;
                 }
-                // Para usuário, lista todas as suas estadias
-                List<VehicleStay> stays = VehicleStayDAO.getAll().stream().filter(s -> s.getUserId().equals(user.getId())).toList();
+                // Mostra todas as estadias concluídas
+                List<VehicleStay> stays = VehicleStayDAO.getAll().stream().filter(s -> s.getExitTime() != null).toList();
                 ctx.json(Map.of("list", stays));
             } catch (Exception e) {
                 ctx.status(500).json(Map.of("error", "Erro: " + e.getMessage()));
@@ -222,8 +234,23 @@ public class Main {
         // Admin: listar users
         app.get("/api/admin/users", ctx -> {
             try {
-                // Implemente UserDAO.getAllUsers() se precisar, ou use uma lista simples
-                ctx.json(Map.of("users", List.of())); // Placeholder
+                List<User> users = UserDAO.getAllUsers();
+                ctx.json(Map.of("users", users));
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("error", e.getMessage()));
+            }
+        });
+
+        // Admin: deletar user
+        app.delete("/api/admin/users", ctx -> {
+            try {
+                int id = Integer.parseInt(ctx.queryParam("id"));
+                boolean deleted = UserDAO.deleteUser(id);
+                if (deleted) {
+                    ctx.status(200).json(Map.of("message", "User deleted"));
+                } else {
+                    ctx.status(404).json(Map.of("error", "User not found"));
+                }
             } catch (Exception e) {
                 ctx.status(500).json(Map.of("error", e.getMessage()));
             }

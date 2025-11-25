@@ -6,11 +6,39 @@
     <title>WebParking</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <script src="https://unpkg.com/vue@next"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+            }
+        }
+    </script>
 </head>
 <body>
     <div id="session">
-        <nav v-if="data" class="navbar navbar-expand-lg bg-body-tertiary">
+        <div v-if="!data" class="card m-2">
+            <div class="card-header">
+                <h1><i class="bi bi-p-square"></i>&nbsp;WebParking authentication</h1>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="login()">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input v-model="loginUsername" type="text" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input v-model="loginPassword" type="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+            </div>
+        </div>
+        <div v-if="error && error!=='No session'" class="alert alert-danger m-2">{{error}}</div>
+    </div>
+
+    <div id="app" v-if="shared.session" :key="shared.session ? 'logged' : 'not'">
+        <nav class="navbar navbar-expand-lg bg-body-tertiary">
             <div class="container-fluid">
                 <a class="navbar-brand" href="#"><i class="bi bi-p-square"></i>&nbsp;WebParking</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText">
@@ -19,102 +47,110 @@
                 <div class="collapse navbar-collapse" id="navbarText">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a class="nav-link" href="#" @click="currentView = 'parking'">Parking</a>
+                            <a class="nav-link" href="#" @click.prevent="currentView = 'parking'">Parking</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#" @click="currentView = 'history'">History</a>
+                            <a class="nav-link" href="#" @click.prevent="currentView = 'history'">History</a>
                         </li>
-                        <li class="nav-item" v-if="data.role === 'ADMIN'">
-                            <a class="nav-link" href="#" @click="currentView = 'users'">Users</a>
+                        <li class="nav-item" v-if="shared.session?.role === 'ADMIN'">
+                            <a class="nav-link" href="#" @click.prevent="currentView = 'users'">Users</a>
                         </li>
                     </ul>
                     <span class="navbar-text">
-                        <i class="bi bi-person"></i>{{data.name || data.username}}
+                        <i class="bi bi-person"></i>{{shared.session?.username}}
                         <button @click="logout()" class="btn btn-sm btn-danger"><i class="bi bi-arrow-right-circle"></i></button>
                     </span>
                 </div>
             </div>
         </nav>
-        <div v-else class="card m-2">
-            <div class="card-header">
-                <h1><i class="bi bi-p-square"></i>&nbsp;WebParking authentication</h1>
-            </div>
-            <div class="card-body">
-                <form>
-                    <div class="mb-3">
-                        <label class="form-label">Username</label>
-                        <input v-model="loginUsername" type="text" class="form-control">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Password</label>
-                        <input v-model="loginPassword" type="password" class="form-control">
-                    </div>
-                    <button @click="login()" type="submit" class="btn btn-primary">Login</button>
-                </form>
-            </div>
-        </div>
-        <div v-if="error && error!=='No session'" class="alert alert-danger m-2">{{error}}</div>
-    </div>
 
-    <div id="app" class="container-fluid m-2" v-if="shared.session">
         <div v-if="currentView === 'parking'">
             <h2>Parking</h2>
             <div class="input-group mb-3">
                 <span class="input-group-text"><i class="bi bi-car-front-fill"></i></span>
-                <input type="text" class="form-control" v-model="newPlate" placeholder="Plate">
-                <input type="text" class="form-control" v-model="newModel" placeholder="Model">
-                <input type="text" class="form-control" v-model="newColor" placeholder="Color">
+                <input type="text" class="form-control" v-model="newPlate" placeholder="Plate" required>
+                <input type="text" class="form-control" v-model="newModel" placeholder="Model" required>
+                <input type="text" class="form-control" v-model="newColor" placeholder="Color" required>
                 <button class="btn btn-primary" @click="addStay"><i class="bi bi-box-arrow-in-down"></i></button>
             </div>
             <table class="table">
-                <tr>
-                    <th>PLACA</th><th>MODEL</th><th>COLOR</th><th>BEGIN</th><th class="text-end">PRICE</th><th>EXIT</th>
-                </tr>
-                <tr v-for="item in parkingList" :key="item.id">
-                    <td>{{ item.vehiclePlate }}</td>
-                    <td>{{ item.vehicleModel }}</td>
-                    <td>{{ item.vehicleColor }}</td>
-                    <td>{{ item.beginStay }}</td>
-                    <td class="text-end">{{ getPrice(item.beginStay).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}</td>
-                    <td><button @click="finishStay(item.id)" class="btn btn-success btn-sm"><i class="bi bi-box-arrow-up"></i> Exit</button></td>
-                </tr>
+                <thead>
+                    <tr>
+                        <th>PLACA</th><th>MODEL</th><th>COLOR</th><th>BEGIN</th><th class="text-end">PRICE</th><th>EXIT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="item in parkingList" :key="item.id">
+                        <td>{{ item.licensePlate }}</td>
+                        <td>{{ item.vehicleModel }}</td>
+                        <td>{{ item.vehicleColor }}</td>
+                        <td>{{ formatDate(item.entryTime) }}</td>
+                        <td class="text-end">{{ getPrice(item.entryTime).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}</td>
+                        <td><button @click="finishStay(item.id)" class="btn btn-success btn-sm"><i class="bi bi-box-arrow-up"></i> Exit</button></td>
+                    </tr>
+                </tbody>
             </table>
         </div>
 
         <div v-if="currentView === 'history'">
             <h2>Parking History</h2>
             <table class="table">
-                <tr><th>ID</th><th>PLACA</th><th>MODEL</th><th>COLOR</th><th>BEGIN</th><th>END</th><th class="text-end">PRICE</th></tr>
-                <tr v-for="item in historyList" :key="item.id">
-                    <td>{{ item.id }}</td><td>{{ item.vehiclePlate }}</td><td>{{ item.vehicleModel }}</td><td>{{ item.vehicleColor }}</td>
-                    <td>{{ item.beginStay }}</td><td>{{ item.endStay }}</td><td class="text-end">{{item.price?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}}</td>
-                </tr>
+                <thead>
+                    <tr><th>ID</th><th>PLACA</th><th>MODEL</th><th>COLOR</th><th>BEGIN</th><th>END</th><th class="text-end">PRICE</th></tr>
+                </thead>
+                <tbody>
+                    <tr v-for="item in historyList" :key="item.id">
+                        <td>{{ item.id }}</td><td>{{ item.licensePlate }}</td><td>{{ item.vehicleModel }}</td><td>{{ item.vehicleColor }}</td>
+                        <td>{{ formatDate(item.entryTime) }}</td><td>{{ item.exitTime ? formatDate(item.exitTime) : '' }}</td><td class="text-end">{{ item.totalCost?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }}</td>
+                    </tr>
+                </tbody>
             </table>
         </div>
 
-        <div v-if="currentView === 'users' && shared.session.role === 'ADMIN'">
+        <div v-if="currentView === 'users' && shared.session?.role === 'ADMIN'">
             <h2>Users <button @click="showAddUser = !showAddUser" class="btn btn-success btn-sm">Add</button></h2>
-            <div v-if="showAddUser" class="mb-3">
-                <input v-model="newUserLogin" placeholder="Login" class="form-control mb-2">
-                <input v-model="newUserName" placeholder="Name" class="form-control mb-2">
-                <input v-model="newUserPassword" type="password" placeholder="Password" class="form-control mb-2">
-                <select v-model="newUserRole" class="form-control mb-2"><option value="USER">USER</option><option value="ADMIN">ADMIN</option></select>
-                <button @click="addUser" class="btn btn-primary">Save</button>
+            <div v-if="showAddUser" class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Add New User</h5>
+                    <div class="mb-3">
+                        <label for="newUserLogin" class="form-label">Username</label>
+                        <input id="newUserLogin" v-model="newUserLogin" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newUserPassword" class="form-label">Password</label>
+                        <input id="newUserPassword" v-model="newUserPassword" type="password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newUserRole" class="form-label">Role</label>
+                        <select id="newUserRole" v-model="newUserRole" class="form-select" required>
+                            <option value="USER">USER</option>
+                            <option value="ADMIN">ADMIN</option>
+                        </select>
+                    </div>
+                    <button @click="addUser" class="btn btn-primary me-2">Save</button>
+                    <button @click="showAddUser = false" class="btn btn-secondary">Cancel</button>
+                </div>
             </div>
             <table class="table">
-                <tr><th>ID</th><th>LOGIN</th><th>NAME</th><th>ROLE</th><th>COMMANDS</th></tr>
-                <tr v-for="user in userList" :key="user.id">
-                    <td>{{ user.id }}</td><td>{{ user.login }}</td><td>{{ user.name }}</td><td>{{ user.role }}</td>
-                    <td><button @click="removeUser(user.id)" class="btn btn-danger btn-sm">Remove</button></td>
-                </tr>
+                <thead>
+                    <tr><th>ID</th><th>USERNAME</th><th>ROLE</th><th>COMMANDS</th></tr>
+                </thead>
+                <tbody>
+                    <tr v-for="user in userList" :key="user.id">
+                        <td>{{ user.id }}</td><td>{{ user.username }}</td><td>{{ user.role }}</td>
+                        <td><button @click="removeUser(user.id)" class="btn btn-danger btn-sm">Remove</button></td>
+                    </tr>
+                </tbody>
             </table>
         </div>
     </div>
 
-    <script>
-        const shared = Vue.reactive({ session: null });
-        
-        const session = Vue.createApp({
+    <script type="module">
+        import { createApp, reactive } from 'vue';
+
+        const shared = reactive({ session: null });
+
+        const session = createApp({
             data() { return { shared, error: null, loginUsername: '', loginPassword: '', data: null }; },
             methods: {
                 async request(url, method, data, token) {
@@ -126,24 +162,45 @@
                     return null;
                 },
                 async loadSession() {
-                    const data = await this.request('/api/session', 'GET');
-                    if (data) { this.data = data; this.error = null; this.shared.session = this.data; }
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                        this.error = 'No session';
+                        return;
+                    }
+                    const data = await this.request('/api/session', 'GET', null, token);
+                    if (data) {
+                        this.data = { ...data, token };
+                        this.error = null;
+                        this.shared.session = this.data;
+                    } else {
+                        localStorage.removeItem('token');
+                        this.error = 'No session';
+                    }
                 },
                 async login() {
                     const data = await this.request('/login', 'POST', { username: this.loginUsername, password: this.loginPassword });
-                    if (data) { this.data = data; this.error = null; this.shared.session = this.data; }
-                },
-                async logout() {
-                    await this.request('/logout', 'PUT', null, this.data.token);
-                    this.data = null; this.shared.session = null;
+                    if (data) {
+                        localStorage.setItem('token', data.token);
+                        const sessionData = await this.request('/api/session', 'GET', null, data.token);
+                        if (sessionData) {
+                            this.data = { ...sessionData, token: data.token };
+                            this.error = null;
+                            this.shared.session = this.data;
+                        }
+                    }
+                }
+            },
+            watch: {
+                'shared.session': function(newVal) {
+                    if (!newVal) this.data = null;
                 }
             },
             mounted() { this.loadSession(); }
         });
         session.mount('#session');
 
-        const app = Vue.createApp({
-            data() { return { shared, currentView: 'parking', parkingList: [], historyList: [], userList: [], newPlate: '', newModel: '', newColor: '', hourPrice: 0, showAddUser: false, newUserLogin: '', newUserName: '', newUserPassword: '', newUserRole: 'USER' }; },
+        const app = createApp({
+            data() { return { shared, currentView: 'parking', parkingList: [], historyList: [], userList: [], newPlate: '', newModel: '', newColor: '', hourPrice: 0, showAddUser: false, newUserLogin: '', newUserPassword: '', newUserRole: 'USER' }; },
             methods: {
                 async request(url, method, data) {
                     const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': this.shared.session.token }, body: data ? JSON.stringify(data) : null });
@@ -171,7 +228,7 @@
                     this.loadParking();
                 },
                 async addUser() {
-                    await this.request('/api/admin/users', 'POST', { username: this.newUserLogin, name: this.newUserName, password: this.newUserPassword, role: this.newUserRole });
+                    await this.request('/api/admin/users', 'POST', { username: this.newUserLogin, password: this.newUserPassword, role: this.newUserRole });
                     this.showAddUser = false;
                     this.loadUsers();
                 },
@@ -179,21 +236,48 @@
                     await this.request(`/api/admin/users?id=${id}`, 'DELETE');
                     this.loadUsers();
                 },
-                getPrice(beginStay) {
-                    const begin = new Date(beginStay);
+                async logout() {
+                    try {
+                        const token = localStorage.getItem('token');
+                        if (token) {
+                            await this.request('/logout', 'PUT', null, token);
+                        }
+                    } catch (e) {
+                        console.error('Logout error:', e);
+                    } finally {
+                        this.shared.session = null;
+                        localStorage.removeItem('token');
+                    }
+                },
+                formatDate(dateArray) {
+                    if (!dateArray) return '';
+                    const [y, m, d, h, min, s] = dateArray;
+                    return `${d.toString().padStart(2, '0')}/${m.toString().padStart(2, '0')}/${y} ${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                },
+                getPrice(entryTimeArray) {
+                    if (!entryTimeArray) return 0;
+                    const [y, m, d, h, min, s, ms] = entryTimeArray;
+                    const begin = new Date(y, m - 1, d, h, min, s, ms);
                     const now = new Date();
-                    const ms = now - begin;
-                    return this.hourPrice * ms / 60 / 60 / 1000;
+                    const msDiff = Math.max(0, now - begin);
+                    return this.hourPrice * msDiff / (1000 * 60 * 60);
                 }
             },
             watch: {
                 currentView(newView) {
-                    if (newView === 'parking') this.loadParking();
-                    else if (newView === 'history') this.loadHistory();
-                    else if (newView === 'users') this.loadUsers();
+                    if (this.shared.session && newView === 'parking') this.loadParking();
+                    else if (this.shared.session && newView === 'history') this.loadHistory();
+                    else if (this.shared.session && newView === 'users') this.loadUsers();
+                },
+                'shared.session': function(newVal) {
+                    if (newVal) this.loadParking();
                 }
             },
-            mounted() { this.loadParking(); }
+            mounted() {
+                if (this.shared.session) {
+                    this.loadParking();
+                }
+            }
         });
         app.mount('#app');
     </script>

@@ -8,6 +8,8 @@ import org.mindrot.jbcrypt.BCrypt;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserDAO {
 
@@ -72,5 +74,41 @@ public class UserDAO {
             }
         }
         return null;
+    }
+
+    public static void clearToken(String token) throws Exception {
+        String sql = "UPDATE users SET token = NULL WHERE token = ?";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, token);
+            pstmt.executeUpdate();
+        }
+    }
+
+    public static List<User> getAllUsers() throws Exception {
+        String sql = "SELECT id, username, role FROM users";
+        List<User> users = new ArrayList<>();
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                User user = new User();
+                user.setId(rs.getInt("id"));
+                user.setUsername(rs.getString("username"));
+                user.setRole(Role.valueOf(rs.getString("role")));
+                users.add(user);
+            }
+        }
+        return users;
+    }
+
+    public static boolean deleteUser(int id) throws Exception {
+        String sql = "DELETE FROM users WHERE id = ?";
+        try (Connection conn = SQLiteConnection.connect();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            int affectedRows = pstmt.executeUpdate();
+            return affectedRows > 0;
+        }
     }
 }
